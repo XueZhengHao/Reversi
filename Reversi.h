@@ -4,9 +4,16 @@
 #define REVERSI_H "Why do you use it? It's invaild."
 
 #include <vector>
+#include <map>
+#include <set>
 #include <memory>
 #include <iostream>
 #include <utility>
+
+template<typename T>
+void print(const T& v) {
+    std::cout << v;
+}
 
 namespace Reversi {
     class Piece {
@@ -23,7 +30,7 @@ namespace Reversi {
         PieceType get_type() const { return this->type; }
 
         Piece(int x, int y, PieceType type) :x(x), y(y), type(type) {}
-        
+
         Piece flip() const {
             return Piece(x, y, filp(type));
         }
@@ -31,11 +38,18 @@ namespace Reversi {
         static PieceType filp(PieceType piece) {
             return piece == PieceType::Black ? PieceType::White : PieceType::Black;
         }
+
+        inline Piece& operator=(const Piece& rhs) {
+            x = rhs.x;
+            y = rhs.y;
+            type = rhs.type;
+            return *this;
+        }
     private:
         int x;
         int y;
 
-        PieceType type;        
+        PieceType type;
     };
 
     inline std::ostream& operator <<(std::ostream& os, Piece p) {
@@ -44,7 +58,12 @@ namespace Reversi {
                 : (p.get_type() == Piece::PieceType::Black ? "X" : "O"));
     }
 
-    bool operator == (const Piece& lhs, const Piece& rhs);
+    inline bool operator == (const Piece& lhs, const Piece& rhs);
+    inline bool operator < (const Piece& lhs, const Piece& rhs) {
+        return lhs.get_x() + lhs.get_y() * 10 < rhs.get_x() + rhs.get_y() * 10;
+    }inline bool operator > (const Piece& lhs, const Piece& rhs) {
+        return !(lhs < rhs);
+    }
 
     class Ground {
         friend  std::ostream& operator<<(std::ostream& os, Ground g);
@@ -58,17 +77,17 @@ namespace Reversi {
         }
 
         void set_piece(const Piece& piece) {
-            pieces.at(piece.get_y()).at(piece.get_x()) = piece;
+            pieces[piece.get_y()][piece.get_x()] = piece;
         }
 
-        void set_piece(int x,int y,Piece::PieceType type) {
+        void set_piece(int x, int y, Piece::PieceType type) {
             set_piece(Piece(x, y, type));
         }
     private:
         int x_size;
         int y_size;
 
-        std::vector<std::vector<Piece >> pieces;
+        std::vector<std::vector<Piece>> pieces;
 
         void init_pieces() {
             for (int i = 0; i < x_size; i++) {
@@ -91,7 +110,7 @@ namespace Reversi {
 
         Game();
 
-        bool add_piece(Piece piece);
+        void add_piece(std::pair< Piece, std::vector<Piece>>);
 
         void calculate_score() {
             blackScore = whiteScore = 0;
@@ -105,23 +124,35 @@ namespace Reversi {
             }
         }
 
-        std::vector<Piece> invaild(Piece::PieceType piece) { return get_invaild_index_and_flip_pieces(piece).first; }
-
         bool game_over() {
             for (int i = 0; i < X_SIZE; i++) {
                 for (int j = 0; j < Y_SIZE; j++) {
-                    if (ground.get_piece(i, j) ==Piece::PieceType::Null)
+                    if (ground.get_piece(i, j) == Piece::PieceType::Null)
                         return false;
                 }
             }
             return true;
         }
+
+        std::map<Piece, std::vector<Piece>>
+            get_invaild(Piece::PieceType type);
     private:
         Ground ground = Ground(X_SIZE, Y_SIZE);
         int blackScore = 0, whiteScore = 0;
 
-        std::pair<std::vector<Piece>, std::vector<std::vector<Piece>>>
-            get_invaild_index_and_flip_pieces(Piece::PieceType type);
+        bool find(int x, int y,
+            std::pair<int, int> direction, Piece::PieceType type, std::vector<Piece>& flips) {
+            flips.emplace_back(x + direction.first, y + direction.second, type);
+            if (x + direction.first <0 || x + direction.first >=X_SIZE ||
+                y + direction.second <0 || y + direction.second >=Y_SIZE ||
+                ground.get_piece(x + direction.first, y + direction.second) == type) {
+                return false;
+            } else if (ground.get_piece(x + direction.first, y + direction.second) == Piece::PieceType::Null) {
+                return true;
+            } else {
+                return find(x + direction.first, y + direction.second, direction, type, flips);
+            }
+        }
     };
 }
 #endif // !REVERSI_H
